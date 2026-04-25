@@ -23,3 +23,32 @@ def call_llm(prompt, system="You are a helpful assistant.", temperature=0.0, max
             print(f"[WARN] {e}", file=sys.stderr)
             time.sleep(3)
     return ""
+
+def tree_of_thought(question, domain, branches=3):
+    approaches = [
+        call_llm(
+            f"Suggest ONE distinct approach #{i+1} (no solution yet):\n{question}",
+            system=SYSTEM[domain], temperature=0.7, max_tokens=150
+        )
+        for i in range(branches)
+    ]
+    scores = []
+    for a in approaches:
+        r = call_llm(
+            f"Problem: {question}\nApproach: {a}\nRate 1-10. Reply with only a number.",
+            system="Reply with only a single integer.", max_tokens=5
+        )
+        nums = re.findall(r"\d+", r)
+        scores.append(int(nums[0]) if nums else 5)
+    best = approaches[scores.index(max(scores))]
+    return call_llm(
+        f"Problem: {question}\nUse this approach:\n{best}\n\nSolve fully and state the final answer.",
+        system=SYSTEM[domain], max_tokens=512
+    )
+
+def verify(question, answer):
+    r = call_llm(
+        f"Q: {question}\nA: {answer}\nIs this correct? Reply True or False only.",
+        system="Reply with exactly True or False.", max_tokens=5
+    )
+    return r.strip().lower().startswith("true")
