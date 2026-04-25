@@ -15,7 +15,7 @@ def get_call_count():
     return call_count
 
 
-def call_llm(prompt, system="You are a helpful assistant.", temperature=0.7, max_tokens=1024):
+def call_llm(prompt, system="You are a helpful assistant. Reply with only the final answer—no explanation.", temperature=0.7, max_tokens=1024):
     global call_count
     call_count += 1
     url = f"{api_base}/chat/completions"
@@ -72,11 +72,30 @@ def call_llm_turns(messages, temperature=0.7, max_tokens=512):
         return None
 
 
+def clean_answer(text):
+    if not text:
+        return ""
+    text = str(text).strip()
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    return lines[-1] if lines else text
+
 def extract_final_answer(text):
     if not text:
         return ""
-    match = re.search(r'(?:answer|result)\s*[:\-]\s*(.+)', text, re.IGNORECASE)
+    text = str(text).strip()
+
+    match = re.search(r'(?:final answer|answer)\s*[:\-]\s*\**\s*(-?[\d]+\.?[\d]*)', text, re.IGNORECASE)
     if match:
         return match.group(1).strip()
-    lines = [l.strip() for l in text.strip().splitlines() if l.strip()]
-    return lines[-1] if lines else text.strip()
+
+    match = re.search(r'(?:final answer|answer)\s*[:\-]\s*\**\s*(.+?)(?:\n|$)', text, re.IGNORECASE)
+    if match:
+        ans = match.group(1).strip().rstrip('*').strip()
+        return ans
+
+    all_numbers = re.findall(r'-?\d+\.?\d*', text)
+    if all_numbers:
+        return all_numbers[-1]
+
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    return lines[-1].lower().strip() if lines else ""

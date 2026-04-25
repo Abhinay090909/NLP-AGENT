@@ -1,34 +1,39 @@
 import re
 from collections import Counter
-from agent.utils import call_llm, call_llm_turns, extract_final_answer
+from agent.utils import call_llm, call_llm_turns, extract_final_answer, clean_answer
 
 
 def chain_of_thought(question):
-    prompt = f"Solve this problem step by step.\nWrite your final answer on a new line starting with 'Answer:'\n\nProblem: {question}"
-    response = call_llm(prompt, temperature=0.3, max_tokens=1024)
-    return extract_final_answer(response)
+    prompt = f"Think step by step in your head.\nDo not show your work.\nReturn only the final answer.\n\nQuestion: {question}"
+    response = call_llm(prompt, temperature=0.3, max_tokens=512)
+    return clean_answer(response)
 
 
-def self_consistency(question, n=5):
-    prompt = f"Solve this problem step by step.\nWrite your final answer on a new line starting with 'Answer:'\n\nProblem: {question}"
+def self_consistency(question, n=2):
+    prompts = [
+        f"Solve this step by step. At the very end write 'Final Answer: X' where X is just the number.\n\nQuestion: {question}",
+        f"Solve using a different approach. At the very end write 'Final Answer: X' where X is just the number.\n\nQuestion: {question}",
+        f"Re-check from scratch carefully. At the very end write 'Final Answer: X' where X is just the number.\n\nQuestion: {question}",
+    ]
     answers = []
-    for _ in range(n):
-        response = call_llm(prompt, temperature=0.7, max_tokens=1024)
-        answer = extract_final_answer(response)
-        if answer:
-            answers.append(answer.lower().strip())
+    for p in prompts:
+        response = call_llm(p, temperature=0.3, max_tokens=1500)
+        if response:
+            ans = extract_final_answer(response)
+            if ans:
+                answers.append(ans)
     if not answers:
         return None
     return Counter(answers).most_common(1)[0][0]
 
 
 def detect_domain(question):
-    prompt = f"Classify this problem into exactly one of these domains:\nmath, logic, commonsense, coding, science, other\n\nProblem: {question}\n\nReply with just the domain name, nothing else."
+    prompt = f"Classify this problem into exactly one of these domains:\nmath, logic, common_sense, coding, future_prediction, planning, science, other\n\nProblem: {question}\n\nReply with just the domain name, nothing else."
     response = call_llm(prompt, temperature=0.0, max_tokens=10)
     if not response:
         return "other"
     response = response.lower().strip()
-    for domain in {"math", "logic", "commonsense", "coding", "science", "other"}:
+    for domain in {"math", "logic", "common_sense", "coding", "future_prediction", "planning", "science", "other"}:
         if domain in response:
             return domain
     return "other"
@@ -36,23 +41,20 @@ def detect_domain(question):
 
 def self_refine(question):
     first = call_llm(
-        f"Solve this problem step by step.\nWrite your final answer on a new line starting with 'Answer:'\n\nProblem: {question}",
-        temperature=0.3,
-        max_tokens=1024
+        f"Solve the problem carefully.\nReturn only the final answer.\n\nQuestion: {question}",
+        temperature=0.3, max_tokens=512
     )
-    if not first:
-        return None
+    first_ans = clean_answer(first)
     refined = call_llm(
-        f"Here is a problem and an attempted solution. Find any mistakes and give a better solution.\nAt the end write your final answer starting with 'Answer:'\n\nProblem: {question}\n\nAttempt: {first}",
-        temperature=0.3,
-        max_tokens=1024
+        f"Check this answer carefully.\nIf it is wrong, fix it.\nReturn only the final answer.\n\nQuestion: {question}\nAnswer to check: {first_ans}",
+        temperature=0.3, max_tokens=512
     )
-    return extract_final_answer(refined) if refined else extract_final_answer(first)
+    return clean_answer(refined) if refined else first_ans
 
 
 def react(question):
     history = [
-        {"role": "system", "content": "You are a problem solver. You can reason and use tools. Available tools: calculator(expr), search(query). When you want to use a tool write TOOL: calculator(2+2) or TOOL: search(query). When you have the final answer write Answer: <answer>"},
+        {"role": "system", "content": "You are a problem solver. Available tools: calculator(expr). Write TOOL: calculator(expr) to use it. When done write Final Answer: <answer>"},
         {"role": "user", "content": f"Solve this: {question}"}
     ]
     for _ in range(4):
@@ -60,7 +62,7 @@ def react(question):
         if not response:
             break
         history.append({"role": "assistant", "content": response})
-        if "answer:" in response.lower():
+        if "final answer:" in response.lower():
             return extract_final_answer(response)
         if "TOOL: calculator(" in response:
             expr = re.search(r'calculator\((.+?)\)', response)
@@ -70,66 +72,52 @@ def react(question):
                 except:
                     result = "error"
                 history.append({"role": "user", "content": f"Tool result: {result}"})
-        elif "TOOL: search(" in response:
-            history.append({"role": "user", "content": "Tool result: no search available, reason from your knowledge"})
     return extract_final_answer(history[-1]["content"]) if history else None
 
 
 def tree_of_thought(question):
     branches = call_llm(
-        f"Generate 3 different approaches to solve this problem. Number them 1, 2, 3. Just the approaches, no full solution yet.\n\nProblem: {question}",
-        temperature=0.7,
-        max_tokens=512
+        f"Generate 3 different approaches to solve this. Number them 1, 2, 3.\n\nProblem: {question}",
+        temperature=0.7, max_tokens=512
     )
     if not branches:
         return chain_of_thought(question)
     result = call_llm(
-        f"Here are 3 approaches to solve a problem. Pick the most promising one and solve it fully.\nEnd with 'Answer: <your answer>'\n\nProblem: {question}\n\nApproaches:\n{branches}",
-        temperature=0.3,
-        max_tokens=1024
+        f"Pick the best approach and solve fully.\nReturn only the final answer.\n\nProblem: {question}\n\nApproaches:\n{branches}",
+        temperature=0.3, max_tokens=512
     )
-    return extract_final_answer(result) if result else None
+    return clean_answer(result) if result else None
+
 
 def decomposition(question):
-    parts = call_llm(
-        f"Break this problem into smaller sub-problems. Number each one.\n\nProblem: {question}",
-        temperature=0.3,
-        max_tokens=512
-    )
-    if not parts:
-        return chain_of_thought(question)
     result = call_llm(
-        f"Here is a problem broken into sub-problems. Solve each sub-problem one by one, then combine to get the final answer.\nEnd with 'Answer: <your answer>'\n\nProblem: {question}\n\nSub-problems:\n{parts}",
-        temperature=0.3,
-        max_tokens=1024
+        f"Break this problem into smaller steps.\nSolve each part carefully in your head.\nReturn only the final answer.\n\nQuestion: {question}",
+        temperature=0.3, max_tokens=512
     )
-    return extract_final_answer(result) if result else None
+    return clean_answer(result)
 
 
 def least_to_most(question):
     simpler = call_llm(
-        f"What simpler problems do you need to solve first before solving this one? List them in order.\n\nProblem: {question}",
-        temperature=0.3,
-        max_tokens=512
+        f"What simpler problems must be solved first? List them briefly.\n\nProblem: {question}",
+        temperature=0.3, max_tokens=256
     )
     if not simpler:
         return chain_of_thought(question)
     result = call_llm(
-        f"Solve this problem by first solving the simpler problems listed, then use those answers to solve the main problem.\nEnd with 'Answer: <your answer>'\n\nMain problem: {question}\n\nSimpler problems to solve first:\n{simpler}",
-        temperature=0.3,
-        max_tokens=1024
+        f"Solve the simpler problems first then answer the main one.\nReturn only the final answer.\n\nMain problem: {question}\nSimpler problems: {simpler}",
+        temperature=0.3, max_tokens=512
     )
-    return extract_final_answer(result) if result else None
+    return clean_answer(result) if result else None
 
 
 def answer_verification(question, answer):
     check = call_llm(
-        f"You are given a problem and a proposed answer. Check if the answer is correct.\nIf correct reply 'CORRECT'. If wrong, solve it properly and end with 'Answer: <your answer>'\n\nProblem: {question}\n\nProposed answer: {answer}",
-        temperature=0.0,
-        max_tokens=1024
+        f"Is this answer correct? Reply CORRECT or give the right answer only.\n\nQuestion: {question}\nAnswer: {answer}",
+        temperature=0.0, max_tokens=256
     )
     if not check:
         return answer
     if "CORRECT" in check.upper():
         return answer
-    return extract_final_answer(check)
+    return clean_answer(check)
