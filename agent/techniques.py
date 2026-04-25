@@ -89,3 +89,47 @@ def tree_of_thought(question):
         max_tokens=1024
     )
     return extract_final_answer(result) if result else None
+
+def decomposition(question):
+    parts = call_llm(
+        f"Break this problem into smaller sub-problems. Number each one.\n\nProblem: {question}",
+        temperature=0.3,
+        max_tokens=512
+    )
+    if not parts:
+        return chain_of_thought(question)
+    result = call_llm(
+        f"Here is a problem broken into sub-problems. Solve each sub-problem one by one, then combine to get the final answer.\nEnd with 'Answer: <your answer>'\n\nProblem: {question}\n\nSub-problems:\n{parts}",
+        temperature=0.3,
+        max_tokens=1024
+    )
+    return extract_final_answer(result) if result else None
+
+
+def least_to_most(question):
+    simpler = call_llm(
+        f"What simpler problems do you need to solve first before solving this one? List them in order.\n\nProblem: {question}",
+        temperature=0.3,
+        max_tokens=512
+    )
+    if not simpler:
+        return chain_of_thought(question)
+    result = call_llm(
+        f"Solve this problem by first solving the simpler problems listed, then use those answers to solve the main problem.\nEnd with 'Answer: <your answer>'\n\nMain problem: {question}\n\nSimpler problems to solve first:\n{simpler}",
+        temperature=0.3,
+        max_tokens=1024
+    )
+    return extract_final_answer(result) if result else None
+
+
+def answer_verification(question, answer):
+    check = call_llm(
+        f"You are given a problem and a proposed answer. Check if the answer is correct.\nIf correct reply 'CORRECT'. If wrong, solve it properly and end with 'Answer: <your answer>'\n\nProblem: {question}\n\nProposed answer: {answer}",
+        temperature=0.0,
+        max_tokens=1024
+    )
+    if not check:
+        return answer
+    if "CORRECT" in check.upper():
+        return answer
+    return extract_final_answer(check)
