@@ -5,19 +5,15 @@ from agent.utils import call_llm, call_llm_turns, extract_final_answer, clean_an
 
 def chain_of_thought(question):
     prompt = f"Think step by step in your head.\nDo not show your work.\nReturn only the final answer.\n\nQuestion: {question}"
-    response = call_llm(prompt, temperature=0.3, max_tokens=512)
+    response = call_llm(prompt, temperature=0.3, max_tokens=256)
     return clean_answer(response)
 
 
-def self_consistency(question, n=2):
-    prompts = [
-        f"Solve this step by step. At the very end write 'Final Answer: X' where X is just the number.\n\nQuestion: {question}",
-        f"Solve using a different approach. At the very end write 'Final Answer: X' where X is just the number.\n\nQuestion: {question}",
-        f"Re-check from scratch carefully. At the very end write 'Final Answer: X' where X is just the number.\n\nQuestion: {question}",
-    ]
+def self_consistency(question, n=1):
+    prompt = f"Solve this step by step. At the very end write 'Final Answer: X' where X is just the number or answer.\n\nQuestion: {question}"
     answers = []
-    for p in prompts:
-        response = call_llm(p, temperature=0.3, max_tokens=1500)
+    for _ in range(n):
+        response = call_llm(prompt, temperature=0.3, max_tokens=1500)
         if response:
             ans = extract_final_answer(response)
             if ans:
@@ -28,15 +24,15 @@ def self_consistency(question, n=2):
 
 
 def detect_domain(question):
-    prompt = f"Classify this problem into exactly one of these domains:\nmath, logic, common_sense, coding, future_prediction, planning, science, other\n\nProblem: {question}\n\nReply with just the domain name, nothing else."
+    prompt = f"Classify this problem into exactly one of these domains:\nmath, common_sense, coding, future_prediction, planning\n\nProblem: {question}\n\nReply with just the domain name, nothing else."
     response = call_llm(prompt, temperature=0.0, max_tokens=10)
     if not response:
-        return "other"
+        return "common_sense"
     response = response.lower().strip()
-    for domain in {"math", "logic", "common_sense", "coding", "future_prediction", "planning", "science", "other"}:
+    for domain in {"math", "common_sense", "coding", "future_prediction", "planning"}:
         if domain in response:
             return domain
-    return "other"
+    return "common_sense"
 
 
 def self_refine(question):

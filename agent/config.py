@@ -8,4 +8,4 @@ model_name = os.getenv("MODEL_NAME", "qwen3-30b-a3b-instruct-2507")
 
 max_llm_calls = 20
 request_timeout = 60
-sleep_between_calls = 0.1
+sleep_between_calls = 0.05
