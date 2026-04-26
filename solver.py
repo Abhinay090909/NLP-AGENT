@@ -1,6 +1,7 @@
 import json
 import time
 import os
+import sys
 from agent.agent import solve
 
 
@@ -14,43 +15,45 @@ def save_answers(answers, path):
         json.dump(answers, f, indent=2)
 
 
-def run(test_path, output_path):
+def run(test_path, output_path, start=0, end=None):
     data = load_data(test_path)
+    if end is None:
+        end = len(data)
+    data = data[start:end]
 
     answers = []
-    start_index = 0
+    resume_index = 0
 
     if os.path.exists(output_path):
         with open(output_path) as f:
             answers = json.load(f)
-        start_index = len(answers)
-        print(f"[solver] resuming from question {start_index + 1}")
+        resume_index = len(answers)
+        print(f"[solver] resuming from question {start + resume_index + 1}")
 
-    for i, item in enumerate(data[start_index:], start=start_index):
+    for i, item in enumerate(data[resume_index:], start=resume_index):
         question = item["input"]
-
-        print(f"\n[solver] Question {i+1}/{len(data)}")
-
+        print(f"\n[solver] Question {start + i + 1}/{6208}")
         try:
             answer = solve(question)
         except Exception as e:
-            print(f"[solver] error on question {i+1}: {e}")
+            print(f"[solver] error: {e}")
             answer = ""
-
         answers.append({"output": str(answer) if answer else ""})
-
         if (i + 1) % 10 == 0:
             save_answers(answers, output_path)
-            print(f"[solver] saved checkpoint at {i+1}")
-
-        time.sleep(0.1)
+            print(f"[solver] checkpoint saved at {start + i + 1}")
+        time.sleep(0.05)
 
     save_answers(answers, output_path)
     print(f"\n[solver] done. saved {len(answers)} answers to {output_path}")
 
 
 if __name__ == "__main__":
+    start = int(sys.argv[1]) if len(sys.argv) > 2 else 0
+    end = int(sys.argv[2]) if len(sys.argv) > 2 else 6208
     run(
         test_path="cse_476_final_project_test_data.json",
-        output_path="cse_476_final_project_answers.json"
+        output_path=f"answers_{start}_{end}.json",
+        start=start,
+        end=end
     )
