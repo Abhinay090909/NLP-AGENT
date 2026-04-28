@@ -9,11 +9,11 @@ def chain_of_thought(question):
     return extract_final_answer(response)
 
 
-def self_consistency(question, n=1):
-    prompt = f"Solve this step by step. At the very end write 'Final Answer: X' where X is just the number or answer.\n\nQuestion: {question}"
+def self_consistency(question, n=3):
+    prompt = f"Think step by step to solve this problem. At the end, write 'Final Answer: ' followed by just the answer.\n\nQuestion: {question}"
     answers = []
     for _ in range(n):
-        response = call_llm(prompt, temperature=0.3, max_tokens=1500)
+        response = call_llm(prompt, temperature=0.7, max_tokens=512)
         if response:
             ans = extract_final_answer(response)
             if ans:
