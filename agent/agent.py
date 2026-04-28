@@ -40,14 +40,15 @@ def solve(question, domain=None):
         answer = self_consistency(question, n=3)
         answer = answer_verification(question, answer)
         if is_garbage(answer):
-            answer = call_llm(
-                f"Give me only the final answer to this math problem, no explanation, just the number or expression.\n\nProblem: {question}",
-                temperature=0.0, max_tokens=256
-            )
-            answer = clean_answer(answer) if answer else ""
+            answer = react(question)
+        if is_garbage(answer):
+            answer = chain_of_thought(question)
+        answer = clean_answer(answer) if answer else ""
 
     elif domain == "coding":
         answer = coding_completion(question)
+        if not answer or len(answer.strip()) < 5:
+            answer = decomposition(question)
 
     elif domain == "common_sense":
         if "best answer for the question among these" in question:
@@ -57,7 +58,7 @@ def solve(question, domain=None):
         elif "answer the question using the context" in question.lower():
             answer = context_answer(question)
         else:
-            answer = self_refine(question)
+            answer = least_to_most(question)
         answer = clean_answer(answer) if answer else ""
 
     elif domain == "future_prediction":
@@ -67,13 +68,7 @@ def solve(question, domain=None):
         answer = planning_completion(question)
 
     else:
-        answer = self_refine(question)
-        if answer and len(answer.split()) > 8:
-            short = call_llm(
-                f"Shorten this answer to the key fact only, 1-5 words max.\n\nAnswer: {answer}\nQuestion: {question}",
-                temperature=0.0, max_tokens=32
-            )
-            answer = clean_answer(short) if short else answer
+        answer = tree_of_thought(question)
         answer = clean_answer(answer) if answer else ""
 
     print(f"[agent] calls used: {get_call_count()} | answer: {answer}")
