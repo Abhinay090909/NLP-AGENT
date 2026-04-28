@@ -123,7 +123,69 @@ def answer_verification(question, answer):
 def coding_completion(question):
     prompt = f"Complete this Python function. Return only the function body with proper indentation. No def line, no imports, no code fences, no explanation.\n\n{question}\n\nFunction body:"
     response = call_llm(prompt, temperature=0.2, max_tokens=1024)
-<<<<<<< HEAD
     return clean_code(response)
-=======
-    return clean_code(response)
+
+def planning_completion(question):
+    is_logistics = "hoist" in question.lower() or "crate" in question.lower()
+    
+    if is_logistics:
+        system = "You are a PDDL planning agent. Output the plan as a sequence of actions. Each line must be exactly: (action hoist crate location) or (drive truck from to) or (load/unload hoist crate truck depot). Use only the exact names from the problem. No extra words."
+        user = f"{question}\nComplete the [PLAN]. Output only action lines like: (lift hoist1 crate0 pallet1 depot1)"
+    else:
+        system = "You are a PDDL planning agent. Study the example plan format carefully and follow it exactly."
+        user = f"{question}\nComplete the [PLAN]. Follow the exact format of the example plan shown above."
+    
+    history = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user}
+    ]
+    r1 = call_llm_turns(history, temperature=0.0, max_tokens=2000)
+    if not r1:
+        return ""
+    history.append({"role": "assistant", "content": r1})
+    history.append({"role": "user", "content": "Rewrite the final plan only. Each line must be (action arg1 arg2 ...) with exact short names. No 'use', no 'to', no 'from', no 'the', no 'object'. Match the example format exactly."})
+    r2 = call_llm_turns(history, temperature=0.0, max_tokens=1024)
+    if not r2:
+        return clean_plan(r1)
+    history.append({"role": "assistant", "content": r2})
+    history.append({"role": "user", "content": "Is every action valid given the preconditions? If not fix it. Output only the corrected plan lines."})
+    r3 = call_llm_turns(history, temperature=0.0, max_tokens=1024)
+    return clean_plan(r3) if r3 else clean_plan(r2)
+
+def mcq_answer(question):
+    options = re.findall(r'\d+\)\s+(.+?)(?=\n\d+\)|\Z)', question, re.DOTALL)
+    options_clean = [o.strip() for o in options]
+    options_formatted = "\n".join(f"{i}) {o}" for i, o in enumerate(options_clean))
+    prompt = f"Choose the best answer. Reply with only the option number.\n\nQuestion:\n{question}\n\nOptions:\n{options_formatted}\n\nReply with only the number."
+    votes = []
+    for _ in range(3):
+        response = call_llm(prompt, temperature=0.3, max_tokens=10)
+        if response:
+            match = re.search(r'\d+', response.strip())
+            if match:
+                idx = int(match.group())
+                if idx < len(options_clean):
+                    votes.append(idx)
+    if not votes:
+        return ""
+    best_idx = Counter(votes).most_common(1)[0][0]
+    return options_clean[best_idx]
+
+
+def tf_answer(question):
+    prompt = f"Think carefully about this question. Consider all facts before answering.\nAnswer with only True or False, nothing else.\n\nQuestion: {question}"
+    response = call_llm(prompt, temperature=0.0, max_tokens=10)
+    if not response:
+        return ""
+    response = response.strip().lower()
+    if "true" in response:
+        return "True"
+    if "false" in response:
+        return "False"
+    return response
+
+
+def context_answer(question):
+    prompt = f"Answer the question using only the information provided in the context. Return only the answer, nothing else.\n\nQuestion and context:\n{question}"
+    response = call_llm(prompt, temperature=0.0, max_tokens=128)
+    return clean_answer(response) if response else ""
