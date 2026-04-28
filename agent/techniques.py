@@ -1,6 +1,6 @@
 import re
 from collections import Counter
-from agent.utils import call_llm, call_llm_turns, extract_final_answer, clean_answer, clean_code
+from agent.utils import call_llm, call_llm_turns, extract_final_answer, clean_answer, clean_code, clean_plan
 
 
 def chain_of_thought(question):
@@ -189,3 +189,27 @@ def context_answer(question):
     prompt = f"Answer the question using only the information provided in the context. Return only the answer, nothing else.\n\nQuestion and context:\n{question}"
     response = call_llm(prompt, temperature=0.0, max_tokens=128)
     return clean_answer(response) if response else ""
+
+def future_prediction(question):
+    prompt = f"Make your best prediction. At the end write 'Final Answer: ' followed by only the predicted value, no explanation.\n\n{question}"
+    response = call_llm(prompt, temperature=0.3, max_tokens=512)
+    if not response:
+        return "[]"
+    boxed = re.search(r'\\boxed\{(.+?)\}', response)
+    if boxed:
+        answer = boxed.group(1).strip()
+    else:
+        answer = extract_final_answer(response)
+    if not answer:
+        return "[]"
+    if not answer.startswith('['):
+        answer = f"['{answer}']"
+    if answer.replace('.','').replace('-','').isdigit():
+        answer = f"[{answer}]" 
+    else:
+        if ',' in answer:
+            items = [f"'{i.strip()}'" for i in answer.split(',')]
+            answer = f"[{', '.join(items)}]"
+        else:
+            answer = f"['{answer}']"
+    return answer

@@ -14,7 +14,8 @@ from agent.techniques import (
     planning_completion,
     mcq_answer,
     tf_answer,
-    context_answer
+    context_answer,
+    future_prediction
 )
 from agent.config import max_llm_calls
 
@@ -60,8 +61,7 @@ def solve(question, domain=None):
         answer = clean_answer(answer) if answer else ""
 
     elif domain == "future_prediction":
-        answer = chain_of_thought(question)
-        answer = clean_answer(answer) if answer else ""
+        answer = future_prediction(question)
 
     elif domain == "planning":
         answer = planning_completion(question)
