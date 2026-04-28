@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+
+# Environment
+.env
+
+# Data files
+*.json
+
+# Eval outputs
+eval_*.txt
+
+# Answer files
+prev_answers/
+answers_*.json
+test_small*

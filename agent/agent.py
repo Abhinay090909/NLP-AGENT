@@ -68,7 +68,6 @@ def solve(question, domain=None):
 
     else:
         answer = self_refine(question)
-        # ask model to shorten if answer is too long
         if answer and len(answer.split()) > 8:
             short = call_llm(
                 f"Shorten this answer to the key fact only, 1-5 words max.\n\nAnswer: {answer}\nQuestion: {question}",
