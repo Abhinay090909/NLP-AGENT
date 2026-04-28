@@ -84,18 +84,13 @@ def extract_final_answer(text):
         return ""
     text = str(text).strip()
 
-    match = re.search(r'(?:final answer|answer)\s*[:\-]\s*\**\s*(-?[\d]+\.?[\d]*)', text, re.IGNORECASE)
+    match = re.search(r'####\s*(.+)', text)
     if match:
         return match.group(1).strip()
 
     match = re.search(r'(?:final answer|answer)\s*[:\-]\s*\**\s*(.+?)(?:\n|$)', text, re.IGNORECASE)
     if match:
-        ans = match.group(1).strip().rstrip('*').strip()
-        return ans
-
-    all_numbers = re.findall(r'-?\d+\.?\d*', text)
-    if all_numbers:
-        return all_numbers[-1]
+        return match.group(1).strip().rstrip('*').strip()
 
     lines = [l.strip() for l in text.splitlines() if l.strip()]
-    return lines[-1].lower().strip() if lines else ""
+    return lines[-1] if lines else ""
