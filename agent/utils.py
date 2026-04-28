@@ -117,6 +117,8 @@ def clean_code(text):
         else:
             normalized.append('')
     return '\n'.join(normalized)
+
+
 def clean_plan(text):
     if not text:
         return ""
@@ -137,4 +139,7 @@ def clean_plan(text):
             plan_lines.append(l)
         elif l and not l.startswith('-') and not l.startswith('#') and not l[0].isdigit():
             plan_lines.append(f"({l})")
+
+    l = re.sub(r'\bpick up\b', 'pick-up', l)
+    l = re.sub(r'\bput down\b', 'put-down', l)
     return '\n'.join(plan_lines)

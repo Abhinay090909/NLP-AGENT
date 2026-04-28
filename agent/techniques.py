@@ -203,7 +203,11 @@ def future_prediction(question):
     if not answer:
         return "[]"
     if not answer.startswith('['):
-        answer = f"['{answer}']"
+        items = [i.strip() for i in answer.split(',')]
+        if len(items) > 1:
+            answer = "[" + ", ".join(f"'{i}'" for i in items) + "]"
+        else:
+            answer = f"['{answer}']"
     if answer.replace('.','').replace('-','').isdigit():
         answer = f"[{answer}]" 
     else:
