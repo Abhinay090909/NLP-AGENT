@@ -13,6 +13,15 @@ from agent.techniques import (
 )
 from agent.config import max_llm_calls
 
+def is_garbage(answer):
+    if not answer:
+        return True
+    if any(c in str(answer) for c in ["\\", "$$", "{", "$"]):
+        return True
+    if not any(c.isdigit() for c in str(answer)):
+        return True
+    return False
+
 def solve(question, domain=None):
     reset_call_count()
 
@@ -22,8 +31,14 @@ def solve(question, domain=None):
     print(f"[agent] domain: {domain} | question: {question[:60]}...")
 
     if domain == "math":
-        answer = self_consistency(question, n=1)
+        answer = self_consistency(question, n=3)
         answer = answer_verification(question, answer)
+        if is_garbage(answer):
+            answer = call_llm(
+                f"Give me only the final answer to this math problem, no explanation, just the number or expression.\n\nProblem: {question}",
+                temperature=0.0, max_tokens=256
+            )
+            answer = clean_answer(answer) if answer else ""
 
     elif domain == "coding":
         answer = decomposition(question)
