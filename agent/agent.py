@@ -9,7 +9,8 @@ from agent.techniques import (
     tree_of_thought,
     decomposition,
     least_to_most,
-    answer_verification
+    answer_verification,
+    coding_completion
 )
 from agent.config import max_llm_calls
 
@@ -41,7 +42,7 @@ def solve(question, domain=None):
             answer = clean_answer(answer) if answer else ""
 
     elif domain == "coding":
-        answer = decomposition(question)
+        answer = coding_completion(question)
 
     elif domain == "common_sense":
         first_word = question.strip().lower().split()[0]

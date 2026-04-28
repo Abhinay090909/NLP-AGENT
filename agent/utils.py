@@ -94,3 +94,26 @@ def extract_final_answer(text):
 
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     return lines[-1] if lines else ""
+
+def clean_code(text):
+    if not text:
+        return ""
+    text = re.sub(r'```[\w]*\n?', '', text)
+    text = re.sub(r'```', '', text).strip()
+    lines = text.splitlines()
+    lines = [l for l in lines if not l.strip().startswith('def ')]
+    if not lines:
+        return ""
+    non_empty = [l for l in lines if l.strip()]
+    if not non_empty:
+        return ""
+    min_indent = min(len(l) - len(l.lstrip()) for l in non_empty)
+    normalized = []
+    for l in lines:
+        if l.strip():
+            current_indent = len(l) - len(l.lstrip())
+            relative_indent = current_indent - min_indent
+            normalized.append('    ' + ' ' * relative_indent + l.lstrip())
+        else:
+            normalized.append('')
+    return '\n'.join(normalized)

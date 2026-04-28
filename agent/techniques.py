@@ -1,6 +1,6 @@
 import re
 from collections import Counter
-from agent.utils import call_llm, call_llm_turns, extract_final_answer, clean_answer
+from agent.utils import call_llm, call_llm_turns, extract_final_answer, clean_answer, clean_code
 
 
 def chain_of_thought(question):
@@ -119,3 +119,8 @@ def answer_verification(question, answer):
         return answer
     corrected = extract_final_answer(check)
     return corrected if corrected else answer
+
+def coding_completion(question):
+    prompt = f"Complete this Python function. Return only the function body with proper indentation. No def line, no imports, no code fences, no explanation.\n\n{question}\n\nFunction body:"
+    response = call_llm(prompt, temperature=0.2, max_tokens=1024)
+    return clean_code(response)
