@@ -1,5 +1,5 @@
 import time
-from agent.utils import reset_call_count, get_call_count, call_llm, clean_answer
+from agent.utils import reset_call_count, get_call_count, call_llm, clean_answer, clean_plan
 from agent.techniques import (
     detect_domain,
     chain_of_thought,
@@ -10,7 +10,11 @@ from agent.techniques import (
     decomposition,
     least_to_most,
     answer_verification,
-    coding_completion
+    coding_completion,
+    planning_completion,
+    mcq_answer,
+    tf_answer,
+    context_answer
 )
 from agent.config import max_llm_calls
 
@@ -45,25 +49,32 @@ def solve(question, domain=None):
         answer = coding_completion(question)
 
     elif domain == "common_sense":
-        first_word = question.strip().lower().split()[0]
-        bool_starters = {"was","would","are","does","will","did","can","is","do","could","were","has","have","had"}
-        if first_word in bool_starters:
-            answer = call_llm(f"Answer with only True or False, nothing else.\n\nQuestion: {question}", temperature=0.0, max_tokens=10)
-            answer = clean_answer(answer) if answer else ""
+        if "best answer for the question among these" in question:
+            answer = mcq_answer(question)
+        elif question.strip().lower().split()[0] in {"was","would","are","does","will","did","can","is","do","could","were","has","have","had"}:
+            answer = tf_answer(question)
+        elif "answer the question using the context" in question.lower():
+            answer = context_answer(question)
         else:
             answer = self_refine(question)
-            answer = clean_answer(answer) if answer else ""
+        answer = clean_answer(answer) if answer else ""
 
     elif domain == "future_prediction":
         answer = chain_of_thought(question)
         answer = clean_answer(answer) if answer else ""
 
     elif domain == "planning":
-        answer = least_to_most(question)
-        answer = answer.strip() if answer else ""
+        answer = planning_completion(question)
 
     else:
-        answer = tree_of_thought(question)
+        answer = self_refine(question)
+        # ask model to shorten if answer is too long
+        if answer and len(answer.split()) > 8:
+            short = call_llm(
+                f"Shorten this answer to the key fact only, 1-5 words max.\n\nAnswer: {answer}\nQuestion: {question}",
+                temperature=0.0, max_tokens=32
+            )
+            answer = clean_answer(short) if short else answer
         answer = clean_answer(answer) if answer else ""
 
     print(f"[agent] calls used: {get_call_count()} | answer: {answer}")
