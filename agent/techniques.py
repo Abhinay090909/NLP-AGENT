@@ -4,9 +4,9 @@ from agent.utils import call_llm, call_llm_turns, extract_final_answer, clean_an
 
 
 def chain_of_thought(question):
-    prompt = f"Think step by step in your head.\nDo not show your work.\nReturn only the final answer.\n\nQuestion: {question}"
-    response = call_llm(prompt, temperature=0.3, max_tokens=256)
-    return clean_answer(response)
+    prompt = f"Think step by step to solve this problem. At the end, write 'Final Answer: ' followed by just the answer.\n\nQuestion: {question}"
+    response = call_llm(prompt, temperature=0.3, max_tokens=512)
+    return extract_final_answer(response)
 
 
 def self_consistency(question, n=1):
