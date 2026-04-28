@@ -116,4 +116,30 @@ def clean_code(text):
             normalized.append('    ' + ' ' * relative_indent + l.lstrip())
         else:
             normalized.append('')
+<<<<<<< HEAD
     return '\n'.join(normalized)
+=======
+    return '\n'.join(normalized)
+
+def clean_plan(text):
+    if not text:
+        return ""
+    lines = text.splitlines()
+    plan_lines = []
+    for l in lines:
+        l = l.strip().lower()
+        if not l:
+            continue
+        if l in ['([plan])', '([plan end])']:
+            continue
+        if l.startswith('(action '):
+            l = '(' + l[8:]
+        if l.startswith('(use '):
+            l = '(' + l[5:]
+        l = l.replace(' from ', ' ').replace(' to ', ' ')
+        if l.startswith('(') and l.endswith(')'):
+            plan_lines.append(l)
+        elif l and not l.startswith('-') and not l.startswith('#') and not l[0].isdigit():
+            plan_lines.append(f"({l})")
+    return '\n'.join(plan_lines)
+>>>>>>> dfaa3a1 (fix: improve planning with subtype detection and multi-turn reasoning)

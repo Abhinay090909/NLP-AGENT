@@ -1,6 +1,10 @@
 import re
 from collections import Counter
+<<<<<<< HEAD
 from agent.utils import call_llm, call_llm_turns, extract_final_answer, clean_answer, clean_code
+=======
+from agent.utils import call_llm, call_llm_turns, extract_final_answer, clean_answer, clean_code, clean_plan
+>>>>>>> dfaa3a1 (fix: improve planning with subtype detection and multi-turn reasoning)
 
 
 def chain_of_thought(question):
@@ -123,4 +127,35 @@ def answer_verification(question, answer):
 def coding_completion(question):
     prompt = f"Complete this Python function. Return only the function body with proper indentation. No def line, no imports, no code fences, no explanation.\n\n{question}\n\nFunction body:"
     response = call_llm(prompt, temperature=0.2, max_tokens=1024)
+<<<<<<< HEAD
     return clean_code(response)
+=======
+    return clean_code(response)
+
+def planning_completion(question):
+    is_logistics = "hoist" in question.lower() or "crate" in question.lower()
+    
+    if is_logistics:
+        system = "You are a PDDL planning agent. Output the plan as a sequence of actions. Each line must be exactly: (action hoist crate location) or (drive truck from to) or (load/unload hoist crate truck depot). Use only the exact names from the problem. No extra words."
+        user = f"{question}\nComplete the [PLAN]. Output only action lines like: (lift hoist1 crate0 pallet1 depot1)"
+    else:
+        system = "You are a PDDL planning agent. Study the example plan format carefully and follow it exactly."
+        user = f"{question}\nComplete the [PLAN]. Follow the exact format of the example plan shown above."
+    
+    history = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user}
+    ]
+    r1 = call_llm_turns(history, temperature=0.0, max_tokens=2000)
+    if not r1:
+        return ""
+    history.append({"role": "assistant", "content": r1})
+    history.append({"role": "user", "content": "Rewrite the final plan only. Each line must be (action arg1 arg2 ...) with exact short names. No 'use', no 'to', no 'from', no 'the', no 'object'. Just action and args."})
+    r2 = call_llm_turns(history, temperature=0.0, max_tokens=1024)
+    if not r2:
+        return clean_plan(r1)
+    history.append({"role": "assistant", "content": r2})
+    history.append({"role": "user", "content": "Is every action valid given the preconditions? If not fix it. Output only the corrected plan lines."})
+    r3 = call_llm_turns(history, temperature=0.0, max_tokens=1024)
+    return clean_plan(r3) if r3 else clean_plan(r2)
+>>>>>>> dfaa3a1 (fix: improve planning with subtype detection and multi-turn reasoning)
