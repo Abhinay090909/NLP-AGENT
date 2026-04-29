@@ -1,52 +1,86 @@
-CSE 476 Final Project Report: General Purpose: Reasoning Agent
+# CSE 476 Final Project — General Purpose Reasoning Agent
 
-Github Link: https://github.com/Abhinay090909/NLP-AGENT
+A reasoning agent that solves questions across five domains using nine inference-time techniques.
 
-System Overview:
-We built a general-purpose reasoning agent that solves problem-solving tasks across five domains: math, common sense, coding, future prediction, and planning. The agent takes a question as input, detects its domain using rule-based pattern matching, selects the most appropriate inference-time technique for that domain, and returns a final answer.
+## Setup
 
-Architecture:
-agent/config.py: API credentials, model name, and global settings max LLM calls, sleep between calls
-agent/utils.py: Core LLM calling functions call_llm and call_llm_turns, call counter, and answer extraction helpers extract_final_answer, clean_answer, clean_code, and clean_plan
-agent/techniques.py: All 9 inference-time techniques as standalone functions
-agent/agent.py: Main solve() function that routes each question to the right technique based on detected domain
-solver.py: Batch runner that loads test data, calls the agent for each question, and saves answers with checkpoint support
-eval.py: — Evaluation script that tests accuracy per domain on dev data with configurable sample size
+1. Clone the repo
+git clone https://github.com/Abhinay090909/NLP-AGENT.git
+cd NLP-AGENT
 
-Techniques Used: 
-We implemented 9 inference-time techniques, all located in agent/techniques.py:
-Domain Routing (detect_domain): Uses one LLM call to classify each question into one of five domains. This routes every question to the most suitable technique automatically.
-Chain of Thought (chain_of_thought): Prompts the model to think step by step before returning the final answer. Used for future prediction questions.
-Self Consistency (self_consistency): Generates multiple independent answers using different prompts and returns the majority vote. Used for math questions to improve reliability.
-Self Refine (self_refine): Generates an initial answer then passes it back to the model with a critique prompt to check and improve it. Used for common sense questions.
-ReACT (react):  Interleaves reasoning steps with tool calls in a multi-turn conversation. The agent can call a calculator tool when needed and decides when to use it automatically.
-Tree of Thought (tree_of_thought): Generates three different solution approaches, evaluates them, and picks the most promising one to solve fully. Used as a fallback for unclassified questions.
-Decomposition (decomposition): Breaks the problem into smaller sub-problems, solves each, then combines them. Used for coding questions.
-Least to Most (least_to_most): Identifies simpler prerequisite problems, solves them in order, then uses those results to solve the main problem. Used for planning questions.
-Answer Verification (answer_verification): After getting an answer, passes it back to the model to verify correctness. If wrong, the model resolves and returns a corrected answer. Used for math questions after self consistency.
+2. Install dependencies
+pip install -r requirements.txt
 
-Domain-Specific Handlers
-In addition to the 8 standard techniques, we built dedicated handlers for each domain subtype: coding_completion for function body completion with normalized indentation, 
-planning_completion for multi-turn plan generation with subtype detection for logistics vs object planning, 
-mcq_answer with self-consistency voting across 3 calls for multiple choice questions, 
-tf_answer for true/false questions, 
-context_answer for reading comprehension questions, and
-future_prediction for formatting predictions as Python lists.
+3. Create a .env file in the root directory
+cp .env.example .env
 
-Efficiency
-We kept LLM calls well under the 20 call limit. Calls per question by domain:
-Math: 4 calls normally (self consistency ×3 + verification), up to 6 calls if fallbacks trigger (+ react + chain of thought)
-Common sense MCQ: 3 calls max 
-Coding: 1-2 calls
-Planning: 3 calls (multi-turn)
-Future prediction: 1 call
-Average across all domains: ~3 calls per question, well within the 20 call budget.
+Then open .env and add your ASU SOL API key:
+OPENAI_API_KEY=your_key_here
+API_BASE=https://openai.rc.asu.edu/v1
+MODEL_NAME=qwen3-30b-a3b-instruct-2507
 
-Team Contributions
+Note: You must be on ASU network or connected via Cisco VPN to use the API.
 
-Abhinay Gorla: Set up the GitHub repository and project structure, coordinated work between teammates, implemented the first three techniques (domain routing, chain of thought, self consistency), built the core utils.py, handled answer extraction logic, and ran testing and evaluation on the first 2000 questions. Updated all techniques with improved prompts and token limits to increase accuracy for math and common sense.
+## Running the Agent
 
-Anish Goli: Implemented the next three techniques (self refine, ReACT with calculator tool support, tree of thought), worked on keeping LLM call count efficient across all domains, added the multi-turn call_llm_turns function to utils, and ran testing and evaluation on the last 2200 questions (4000-6208). Ran multiple tests to compare the final output answers file.
+To run on the full test data:
+python3 solver.py
 
-Lahari Popuri:  Implemented the final three techniques (decomposition, least to most, answer verification), worked on the domain-specific prompting strategy for each of the five domains, contributed to the agent routing logic in agent.py, and ran testing and evaluation on questions 2000-4000. Worked on improving the accuracy rate of planning and future prediction domains.
+To run on a specific range of questions (for parallel runs):
+python3 solver.py 0 2000
+python3 solver.py 2000 4000
+python3 solver.py 4000 6208
 
+The solver saves a checkpoint every 10 questions so it can resume if interrupted.
+Output is saved to cse_476_final_project_answers.json
+
+To test on a single question:
+python3 -c "
+from agent.agent import solve
+print(solve('What is 2 + 2?'))
+"
+
+## Project Structure
+
+NLP-AGENT/
+agent/
+    __init__.py
+    config.py         # API settings and global config
+    utils.py          # LLM caller, call tracker, answer extraction
+    techniques.py     # All 9 inference-time techniques
+    agent.py          # Main solve() function with domain routing
+solver.py             # Batch runner for test data
+merge.py              # Merges parallel answer files
+report.md             # One page project report
+requirements.txt      # Dependencies
+
+## The 9 Techniques
+
+All techniques are in agent/techniques.py
+
+1. Domain Routing       - detect_domain()        - classifies each question into a domain
+2. Chain of Thought     - chain_of_thought()     - step by step reasoning
+3. Self Consistency     - self_consistency()     - multiple answers with majority vote
+4. Self Refine          - self_refine()          - generate then critique and improve
+5. ReACT                - react()                - reason and use calculator tool
+6. Tree of Thought      - tree_of_thought()      - generate and evaluate multiple approaches
+7. Decomposition        - decomposition()        - break into sub-problems
+8. Least to Most        - least_to_most()        - solve simpler problems first
+9. Answer Verification  - answer_verification()  - verify and correct the answer
+
+## Domain Strategy
+
+| Domain            | Technique Used                        |
+|-------------------|---------------------------------------|
+| math              | Self Consistency + Answer Verification|
+| common_sense      | Self Refine                           |
+| coding            | Decomposition                         |
+| future_prediction | Chain of Thought                      |
+| planning          | Least to Most                         |
+| other             | Tree of Thought                       |
+
+## Requirements
+
+- Python 3.6+
+- ASU SOL API key from Voyager portal
+- ASU VPN or on-campus network
