@@ -96,4 +96,4 @@ def eval_agent(dev_path, domain_filter=None, n_per_domain=10, seed=42):
 
 if __name__ == "__main__":
     domain = sys.argv[1] if len(sys.argv) > 1 else None
-    eval_agent("cse476_final_project_dev_data.json", domain_filter=domain)
+    eval_agent("cse476_final_project_dev_data.json", domain_filter=domain, seed=777)
